@@ -14,12 +14,12 @@ from pyemma.msm import MSM,markov_model
 from scipy import linalg
 from approximate_diffusion_models import OneDimensionalModel
 
+import potential_function
+
 all_trajs=np.load('data/traj.npy')
 all_trajs_val=np.load('data/traj_val.npy')
 
 beta=1.
-def potential_function(x):
-    return 4*(x**8+0.8*np.exp(-80*x*x)+0.2*np.exp(-80*(x-0.5)**2)+0.5*np.exp(-40*(x+0.5)**2))
 
 lb=-1.
 ub=1.
