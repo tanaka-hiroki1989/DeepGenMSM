@@ -8,13 +8,7 @@ from scipy.stats import norm
 import torch.utils.data as Data
 from math import pi,inf,log
 import copy
-
-from pyemma.plots import scatter_contour
-from pyemma.msm import MSM,markov_model
-from scipy import linalg
-from approximate_diffusion_models import OneDimensionalModel
-
-import potential_function
+from networks import Net_P,Net_G
 
 all_trajs=np.load('data/traj.npy')
 all_trajs_val=np.load('data/traj_val.npy')
@@ -47,84 +41,6 @@ def log_sum_exp(value, dim=None, keepdim=False):
         sum_exp = torch.sum(torch.exp(value - m))
     return m + torch.log(sum_exp)
 
-class EarlyStopping:
-    def __init__(self,p=0):
-        self.patience=p
-        self.j=0
-        self.v=inf
-        self.other_parameters=None
-
-    def reset(self):
-        self.j=0
-        self.v=inf
-        self.other_parameters=None
-    
-    def read_validation_result(self,model,validation_cost,other_parameters=None):
-        if validation_cost<self.v:
-            self.j=0
-            self.model=copy.deepcopy(model)
-            self.v=validation_cost
-            self.other_parameters=other_parameters
-        else:
-            self.j+=1
-        if self.j>=self.patience:
-            return True
-        return False
-    
-    def get_best_model(self):
-        return copy.deepcopy(self.model)
-
-    def get_best_other_parameters(self):
-        return self.other_parameters
-
-class Net_P(nn.Module):
-    def __init__(self,input_dim,state_num,net_width=64,n_hidden_layer=4):
-        super(Net_P, self).__init__()
-        self.input_dim=input_dim
-        self.state_num=state_num
-        self.net_width=net_width
-        self.n_hidden_layer=n_hidden_layer
-        
-        self.hidden_layer_list=nn.ModuleList([nn.Linear(input_dim,net_width)]+[nn.Linear(net_width, net_width) for i in range(n_hidden_layer-1)])
-        self.output_layer=nn.Linear(net_width,state_num)
-        self.bn_input=nn.BatchNorm1d(input_dim)
-        self.bn_hidden_list=nn.ModuleList([nn.BatchNorm1d(net_width) for i in range(n_hidden_layer)])
-        self.bn_output=nn.BatchNorm1d(state_num)
-
-    def forward(self,x):
-        x=self.bn_input(x)
-        for i in range(self.n_hidden_layer):
-            x=self.hidden_layer_list[i](x)
-            x=self.bn_hidden_list[i](x)
-            x=F.relu(x)
-        x=self.output_layer(x)
-        x=self.bn_output(x)
-        x=F.log_softmax(x,dim=1)
-        return x
-        
-class Net_G(nn.Module):
-    def __init__(self,input_dim,state_num,eps=0,net_width=64,n_hidden_layer=4):
-        super(Net_G, self).__init__()
-        self.input_dim=input_dim
-        self.state_num=state_num
-        self.net_width=net_width
-        self.n_hidden_layer=n_hidden_layer
-        self.eps=eps
-        
-        self.hidden_layer_list=nn.ModuleList([nn.Linear(input_dim,net_width)]+[nn.Linear(net_width, net_width) for i in range(n_hidden_layer-1)])
-        self.output_layer=nn.Linear(net_width,state_num)
-        self.bn_input=nn.BatchNorm1d(input_dim)
-        self.bn_hidden_list=nn.ModuleList([nn.BatchNorm1d(net_width) for i in range(n_hidden_layer)])
-
-    def forward(self,x):
-        x=self.bn_input(x)
-        for i in range(self.n_hidden_layer):
-            x=self.hidden_layer_list[i](x)
-            x=self.bn_hidden_list[i](x)
-            x=F.relu(x)
-        x=self.output_layer(x)
-        return x
-    
 state_num=4
 
 partition_mem=np.empty([3,diffusion_model.center_list.shape[0],state_num])
